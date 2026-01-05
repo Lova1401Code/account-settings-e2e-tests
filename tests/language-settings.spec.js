@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { loginAndSelectProfile } from './test-config.js';
 
 // Helper pour naviguer vers une page protégée
 const gotoProtectedPage = async (page, url, maxRetries = 3) => {
@@ -24,10 +23,6 @@ const gotoProtectedPage = async (page, url, maxRetries = 3) => {
 };
 
 test.describe('Language settings', () => {
-
-  test.beforeEach(async ({ page }) => {
-    await loginAndSelectProfile(page);
-  });
 
   // Helper pour naviguer vers la page des langues du premier profil
   const goToLanguagesPage = async (page) => {

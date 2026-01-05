@@ -22,5 +22,22 @@ export default defineConfig({
     ['list'],
     ['html', { open: 'never' }]
   ],
+  
+  // Projets : setup d'authentification + tests
+  projects: [
+    // Projet de setup : se connecte et sauvegarde la session
+    {
+      name: 'setup',
+      testMatch: /auth\.setup\.js/,
+    },
+    // Projet principal : utilise la session authentifiée
+    {
+      name: 'chromium',
+      use: {
+        storageState: '.auth/user.json',
+      },
+      dependencies: ['setup'],
+      testIgnore: /auth\.setup\.js/,
+    },
+  ],
 });
-

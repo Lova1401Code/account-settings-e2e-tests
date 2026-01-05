@@ -1,14 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { loginAndSelectProfile } from './test-config.js';
 
 test.describe('Avatar Selection Page - E2E Tests', () => {
   // Avatar categories expected
   const expectedCategories = ['Faces', 'Buildings', 'Transportation', 'Sports', 'Shapes', 'Animals', 'Alphabet'];
-
-  // Se connecter une fois avant chaque test
-  test.beforeEach(async ({ page }) => {
-    await loginAndSelectProfile(page);
-  });
 
   test.describe('Page Display', () => {
     test('Display Avatar Selection page with title', async ({ page }) => {

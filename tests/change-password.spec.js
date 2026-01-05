@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { testUser, loginAndSelectProfile } from './test-config.js';
+import { testUser } from './test-config.js';
 
 // Helper pour naviguer vers une page protégée en attendant security-info
 const gotoProtectedPage = async (page, url, maxRetries = 3) => {
@@ -26,13 +26,6 @@ const gotoProtectedPage = async (page, url, maxRetries = 3) => {
 };
 
 test.describe('Password change', () => {
-
-  test.beforeEach(async ({ page }) => {
-    await loginAndSelectProfile(page);
-    
-    // Aller sur le dashboard pour initialiser la session
-    await gotoProtectedPage(page, '/account-settings/');
-  });
 
   test('Display of the password change page', async ({ page }) => {
     await gotoProtectedPage(page, '/account-settings/change-password');

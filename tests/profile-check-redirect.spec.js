@@ -1,17 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { loginWithRealCredentials, loginAndSelectProfile } from './test-config.js';
 
 test.describe('Profile Check & Redirect - E2E Tests', () => {
   // ============================================
-  // TESTS E2E RÉELS
+  // TESTS E2E RÉELS (authentifié via storageState)
   // ============================================
 
   test.describe('Create Profile Alert - Default Profile Only', () => {
     test('Display create profile alert when customer has only default profile', async ({ page }) => {
-      // Se connecter et sélectionner un profil
-      await loginAndSelectProfile(page);
-      
-      // Aller sur account-settings
+      // Aller sur account-settings (déjà authentifié via storageState)
       await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
 
       // Attendre que la page soit chargée
@@ -23,7 +19,6 @@ test.describe('Profile Check & Redirect - E2E Tests', () => {
     });
 
     test('Display Create profile button in alert', async ({ page }) => {
-      await loginAndSelectProfile(page);
       await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
 
       await expect(page.locator('h1').first()).toBeVisible({ timeout: 15000 });
@@ -33,7 +28,6 @@ test.describe('Profile Check & Redirect - E2E Tests', () => {
     });
 
     test('Create profile button navigates to create profile page', async ({ page }) => {
-      await loginAndSelectProfile(page);
       await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
 
       await expect(page.locator('h1').first()).toBeVisible({ timeout: 15000 });
@@ -46,7 +40,6 @@ test.describe('Profile Check & Redirect - E2E Tests', () => {
     });
 
     test('Close button dismisses the alert', async ({ page }) => {
-      await loginAndSelectProfile(page);
       await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
 
       await expect(page.locator('h1').first()).toBeVisible({ timeout: 15000 });
@@ -64,31 +57,21 @@ test.describe('Profile Check & Redirect - E2E Tests', () => {
 
   test.describe('Redirect to Profile Selection - No Active Profile', () => {
     test('Redirect to select-profile when no active profile selected', async ({ page }) => {
-      // Se connecter - après connexion, on est redirigé vers select-profile
-      // si aucun profil n'est encore sélectionné
-      await loginWithRealCredentials(page);
+      // Supprimer le profileId du localStorage pour simuler "pas de profil sélectionné"
+      await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
+      await page.evaluate(() => {
+        localStorage.removeItem('profileId');
+      });
       
-      // Après connexion, devrait être sur select-profile ou account-settings
-      const currentUrl = page.url();
+      // Recharger la page
+      await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
       
-      // Si on est sur select-profile, le test est réussi
-      if (currentUrl.includes('select-profile')) {
-        await expect(page).toHaveURL(/\/select-profile/, { timeout: 5000 });
-      } else {
-        // Sinon, supprimer le profileId et recharger
-        await page.evaluate(() => {
-          localStorage.removeItem('profileId');
-        });
-        await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
-        // Devrait être redirigé vers select-profile
-        await expect(page).toHaveURL(/\/select-profile/, { timeout: 15000 });
-      }
+      // Devrait être redirigé vers select-profile
+      await expect(page).toHaveURL(/\/select-profile/, { timeout: 15000 });
     });
 
     test('Profile selection page displays profiles', async ({ page }) => {
-      await loginWithRealCredentials(page);
-      
-      // Aller sur select-profile
+      // Aller sur select-profile (déjà authentifié via storageState)
       await page.goto('/account-settings/select-profile', { waitUntil: 'domcontentloaded' });
 
       // Vérifier que le titre est affiché
@@ -99,8 +82,6 @@ test.describe('Profile Check & Redirect - E2E Tests', () => {
     });
 
     test('Selecting a profile navigates away from selection page', async ({ page }) => {
-      await loginWithRealCredentials(page);
-      
       // Aller sur select-profile
       await page.goto('/account-settings/select-profile', { waitUntil: 'domcontentloaded' });
 
@@ -118,7 +99,6 @@ test.describe('Profile Check & Redirect - E2E Tests', () => {
 
   test.describe('Profile Selection Page Features', () => {
     test('Display Who is watching title', async ({ page }) => {
-      await loginWithRealCredentials(page);
       await page.goto('/account-settings/select-profile', { waitUntil: 'domcontentloaded' });
 
       // Vérifier le titre
@@ -126,7 +106,6 @@ test.describe('Profile Check & Redirect - E2E Tests', () => {
     });
 
     test('Display Add Profile button if less than max profiles', async ({ page }) => {
-      await loginWithRealCredentials(page);
       await page.goto('/account-settings/select-profile', { waitUntil: 'domcontentloaded' });
 
       await expect(page.locator('h1')).toContainText("Who's watching", { timeout: 15000 });
@@ -136,7 +115,6 @@ test.describe('Profile Check & Redirect - E2E Tests', () => {
     });
 
     test('Display Manage Profiles button', async ({ page }) => {
-      await loginWithRealCredentials(page);
       await page.goto('/account-settings/select-profile', { waitUntil: 'domcontentloaded' });
 
       await expect(page.locator('h1')).toContainText("Who's watching", { timeout: 15000 });

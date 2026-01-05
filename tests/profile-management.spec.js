@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { loginAndSelectProfile } from './test-config.js';
 
 // Helper pour naviguer vers une page protégée en attendant security-info
 const gotoProtectedPage = async (page, url, maxRetries = 3) => {
@@ -37,10 +36,6 @@ const goToFirstProfileManagement = async (page) => {
 };
 
 test.describe('Profile Management', () => {
-
-  test.beforeEach(async ({ page }) => {
-    await loginAndSelectProfile(page);
-  });
 
   // ============================================
   // PROFILE CREATION TESTS
