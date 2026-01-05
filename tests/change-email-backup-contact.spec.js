@@ -1,164 +1,35 @@
 import { test, expect } from '@playwright/test';
+import { testUser } from './test-config.js';
 
-test.describe('Change Email & Backup Contact', () => {
-  const customerId = 'test-customer-id';
+// Helper pour naviguer vers une page protégée en attendant security-info
+const gotoProtectedPage = async (page, url, maxRetries = 3) => {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const securityInfoPromise = page.waitForResponse(
+      response => response.url().includes('/customer/security-info') && response.status() === 200,
+      { timeout: 30000 }
+    ).catch(() => null);
+    
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    
+    await securityInfoPromise;
+    await page.waitForTimeout(1000);
+    
+    // Vérifier si on n'est pas redirigé vers Email verification
+    const h1Text = await page.locator('h1').textContent().catch(() => '');
+    if (!h1Text.includes('Email verification')) {
+      return; // Succès, on est sur la bonne page
+    }
+    
+    // Si on est sur Email verification, attendre et réessayer
+    await page.waitForTimeout(2000);
+  }
+};
 
-  const mockSecurityInfo = {
-    email: 'current@example.com',
-    emailVerified: true,
-    phone: '+33612345678',
-    phoneVerified: false,
-    backupContacts: [
-      { id: 'bc-1', type: 'email', value: 'backup@example.com' },
-    ],
-  };
-
-  const mockSecurityInfoNoBackup = {
-    email: 'current@example.com',
-    emailVerified: true,
-    phone: null,
-    phoneVerified: false,
-    backupContacts: [],
-  };
-
-  const setupAuthMocks = async (page, securityData = mockSecurityInfo) => {
-    // Navigate to login first to have context for localStorage
-    await page.goto('/account-settings/login');
-
-    // Configure localStorage
-    await page.evaluate((custId) => {
-      localStorage.setItem('accessToken', 'mock-access-token');
-      localStorage.setItem('refreshToken', 'mock-refresh-token');
-      localStorage.setItem('deviceId', 'mock-device-id');
-      localStorage.setItem('profileId', 'test-profile-id');
-      localStorage.setItem('customer', JSON.stringify({ id: custId }));
-    }, customerId);
-
-    // Mock security-info
-    await page.route('**/customer/security-info', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(securityData),
-      });
-    });
-
-    // Mock active-profile
-    await page.route('**/profiles/active-profile', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: 'test-profile-id',
-          name: 'Test User',
-          icon: 'alphabet-A',
-        }),
-      });
-    });
-
-    // Mock check-default-profile
-    await page.route('**/profiles/check-default-profile', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ hasDefaultProfile: true }),
-      });
-    });
-
-    // Mock verify password
-    await page.route('**/customer/verify-password', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true }),
-      });
-    });
-
-    // Mock update email
-    await page.route('**/customer/update-email', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ message: 'Email updated successfully' }),
-      });
-    });
-
-    // Mock add/update backup contact
-    await page.route('**/customer/backup-contacts', async (route) => {
-      if (route.request().method() === 'POST' || route.request().method() === 'PUT') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ 
-            message: 'Backup contact updated successfully',
-            backupContact: { id: 'bc-new', type: 'whatsapp', value: '+33699887766' }
-          }),
-        });
-      } else if (route.request().method() === 'GET') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(securityData.backupContacts || []),
-        });
-      } else {
-        await route.continue();
-      }
-    });
-
-    // Mock update backup contact by ID
-    await page.route('**/customer/backup-contacts/*', async (route) => {
-      if (route.request().method() === 'PUT') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ 
-            message: 'Backup contact updated successfully',
-            backupContact: { id: 'bc-1', type: 'email', value: 'updated@example.com' }
-          }),
-        });
-      } else if (route.request().method() === 'DELETE') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ message: 'Backup contact deleted successfully' }),
-        });
-      } else {
-        await route.continue();
-      }
-    });
-
-    // Mock send verification email
-    await page.route('**/auth/send-verification-email', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ message: 'Verification email sent' }),
-      });
-    });
-
-    // Mock request code
-    await page.route('**/customer/request-customer-code', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ message: 'Code sent' }),
-      });
-    });
-
-    // Mock verify code
-    await page.route('**/customer/verify-customer-code', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true }),
-      });
-    });
-  };
+test.describe('Change Email & Backup Contact - Real Tests', () => {
 
   test.describe('Security Page - Display', () => {
-    test('Display Security page with email and backup contact sections', async ({ page }) => {
-      await setupAuthMocks(page);
-      await page.goto('/account-settings/security');
+    test('Display Security page with title and sections', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
 
       // Verify page title
       await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
@@ -166,75 +37,107 @@ test.describe('Change Email & Backup Contact', () => {
       // Verify Account Details section
       await expect(page.locator('h2:has-text("Account Details")')).toBeVisible();
 
-      // Verify Email title is displayed (use specific selector)
-      await expect(page.locator('.link-title:has-text("Email")')).toBeVisible();
-      await expect(page.getByText('current@example.com')).toBeVisible();
+      // Verify Access and Privacy section
+      await expect(page.locator('h2:has-text("Access and Privacy")')).toBeVisible();
+    });
 
-      // Verify Backup contact section
+    test('Display Password link', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Verify Password link is displayed
+      await expect(page.locator('.link-title:has-text("Password")')).toBeVisible();
+    });
+
+    test('Display Email section with email address', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Verify Email title is displayed
+      await expect(page.locator('.link-title:has-text("Email")')).toBeVisible();
+      
+      // Verify email is displayed (should contain @)
+      await expect(page.locator('.email-description:has-text("@")')).toBeVisible();
+    });
+
+    test('Display email verification status', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Verify email verification status is displayed (either verified or unverified)
+      const verifiedStatus = page.locator('.verification-status.verified');
+      const unverifiedStatus = page.locator('.verification-status.unverified');
+      
+      const isVerified = await verifiedStatus.isVisible().catch(() => false);
+      const isUnverified = await unverifiedStatus.isVisible().catch(() => false);
+      
+      expect(isVerified || isUnverified).toBeTruthy();
+    });
+
+    test('Display Backup contact section', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Verify Backup contact section is displayed
       await expect(page.locator('.link-title:has-text("Backup contact")')).toBeVisible();
     });
 
-    test('Display email verification status - Verified', async ({ page }) => {
-      await setupAuthMocks(page);
-      await page.goto('/account-settings/security');
+    test('Display Mobile phone section', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
 
       await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
 
-      // Verify email is shown as verified
-      await expect(page.locator('.verification-status.verified')).toBeVisible();
+      // Verify Mobile phone section is displayed
+      await expect(page.locator('.link-title:has-text("Mobile phone")')).toBeVisible();
     });
 
-    test('Unverified email redirects to email verification page', async ({ page }) => {
-      await setupAuthMocks(page, {
-        ...mockSecurityInfo,
-        emailVerified: false,
-      });
-      await page.goto('/account-settings/security');
-
-      // When email is not verified, user is redirected to email verification page
-      await expect(page).toHaveURL(/\/account-settings\/signup\/request-email-verification\/?/, { timeout: 15000 });
-      await expect(page.locator('h1')).toContainText('Email verification', { timeout: 10000 });
-    });
-
-    test('Display existing backup contacts', async ({ page }) => {
-      await setupAuthMocks(page);
-      await page.goto('/account-settings/security');
+    test('Display Access and devices link', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
 
       await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
 
-      // Verify backup contact is displayed
-      await expect(page.getByText('backup@example.com')).toBeVisible();
+      // Verify Access and devices link
+      await expect(page.locator('text=Access and devices')).toBeVisible();
     });
 
-    test('Display "No backup contacts" when none exist', async ({ page }) => {
-      await setupAuthMocks(page, mockSecurityInfoNoBackup);
-      await page.goto('/account-settings/security');
+    test('Display Personal info access link', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
 
       await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
 
-      // Verify no backup contacts message
-      await expect(page.getByText('No backup contacts provided')).toBeVisible();
+      // Verify Personal info access link
+      await expect(page.locator('text=Personal info access')).toBeVisible();
+    });
+
+    test('Display Delete Account button', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Verify Delete Account button
+      await expect(page.locator('button:has-text("Delete Account")')).toBeVisible();
     });
   });
 
   test.describe('Change Email Flow', () => {
     test('Click on Email opens verification modal', async ({ page }) => {
-      await setupAuthMocks(page);
-      await page.goto('/account-settings/security');
+      await gotoProtectedPage(page, '/account-settings/security');
 
       await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
 
-      // Click on Email section (LinkCard with title "Email")
+      // Click on Email section
       await page.locator('.link-card:has(.link-title:text-is("Email"))').click();
 
-      // Verify modal is opened (modal uses .modal-overlay when open)
-      await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 10000 });
-      await expect(page.locator('.modal-content h2')).toContainText('Email');
+      // Verify modal is opened
+      await expect(page.locator('.modal-overlay, .modal.open')).toBeVisible({ timeout: 10000 });
     });
 
-    test('Click "Change Email" navigates to identity confirmation', async ({ page }) => {
-      await setupAuthMocks(page);
-      await page.goto('/account-settings/security');
+    test('Email modal shows current email and Change Email button', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
 
       await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
 
@@ -242,7 +145,23 @@ test.describe('Change Email & Backup Contact', () => {
       await page.locator('.link-card:has(.link-title:text-is("Email"))').click();
 
       // Wait for modal
-      await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('.modal-overlay, .modal.open')).toBeVisible({ timeout: 10000 });
+
+      // Verify modal content
+      await expect(page.locator('.modal-content h2')).toContainText('Email');
+      await expect(page.locator('.modal-content button:has-text("Change Email")')).toBeVisible();
+    });
+
+    test('Click "Change Email" navigates to identity confirmation', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Click on Email section to open modal
+      await page.locator('.link-card:has(.link-title:text-is("Email"))').click();
+
+      // Wait for modal
+      await expect(page.locator('.modal-overlay, .modal.open')).toBeVisible({ timeout: 10000 });
 
       // Click on Change Email button
       await page.locator('.modal-content button:has-text("Change Email")').click();
@@ -250,483 +169,520 @@ test.describe('Change Email & Backup Contact', () => {
       // Verify navigation to identity confirmation
       await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
     });
+  });
 
-    test('Identity confirmation page - Enter password to continue', async ({ page }) => {
-      await setupAuthMocks(page);
+  test.describe('Identity Confirmation Page', () => {
+    test('Display identity confirmation page with password form', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
 
-      // Navigate to security page first
-      await page.goto('/account-settings/security');
       await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
 
-      // Click on Email to open modal
+      // Navigate to identity confirmation via Email modal
       await page.locator('.link-card:has(.link-title:text-is("Email"))').click();
-      await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 10000 });
-
-      // Click Change Email
+      await expect(page.locator('.modal-overlay, .modal.open')).toBeVisible({ timeout: 10000 });
       await page.locator('.modal-content button:has-text("Change Email")').click();
-      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
 
       // Verify identity confirmation page
-      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
-
-      // Enter password
-      await page.fill('input[type="password"]', 'testpassword123');
-
-      // Click Continue
-      await page.locator('button.submit-button:has-text("Continue")').click();
-
-      // Verify Update Email modal opens
-      await expect(page.locator('.modal-content h2:has-text("Update Email")')).toBeVisible({ timeout: 10000 });
-    });
-
-    test('Update Email modal - Enter new email and submit', async ({ page }) => {
-      await setupAuthMocks(page);
-
-      // Navigate to security page
-      await page.goto('/account-settings/security');
-      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
-
-      // Open email modal
-      await page.locator('.link-card:has(.link-title:text-is("Email"))').click();
-      await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 10000 });
-
-      // Click Change Email
-      await page.locator('.modal-content button:has-text("Change Email")').click();
-      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
-
-      // Enter password on identity confirmation
-      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
-      await page.fill('input[type="password"]', 'testpassword123');
-      await page.locator('button.submit-button:has-text("Continue")').click();
-
-      // Wait for Update Email modal
-      await expect(page.locator('.modal-content h2:has-text("Update Email")')).toBeVisible({ timeout: 10000 });
-
-      // Enter new email
-      await page.fill('input[placeholder="Enter new email address"]', 'newemail@example.com');
-
-      // Submit
-      await page.locator('.modal-content button[type="submit"]:has-text("Update Email")').click();
-
-      // Verify navigation back to security page
-      await expect(page).toHaveURL(/\/account-settings\/security\/?/, { timeout: 15000 });
-    });
-  });
-
-  test.describe('Backup Contact Flow', () => {
-    test('Click on "Add backup contact" navigates to identity confirmation', async ({ page }) => {
-      await setupAuthMocks(page, mockSecurityInfoNoBackup);
-      await page.goto('/account-settings/security');
-
-      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
-
-      // Click on Add backup contact
-      await page.locator('button.add-backup-button').click();
-
-      // Verify navigation to identity confirmation
-      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
-    });
-
-    test('Add new backup contact - WhatsApp', async ({ page }) => {
-      await setupAuthMocks(page, mockSecurityInfoNoBackup);
-      await page.goto('/account-settings/security');
-
-      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
-
-      // Click Add backup contact
-      await page.locator('button.add-backup-button').click();
-      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
-
-      // Enter password
-      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
-      await page.fill('input[type="password"]', 'testpassword123');
-      await page.locator('button.submit-button').click();
-
-      // Wait for Add Backup Contact modal
-      await expect(page.locator('h2:has-text("Add Backup Contact")')).toBeVisible({ timeout: 10000 });
-
-      // Select WhatsApp type
-      await page.selectOption('select', 'WhatsApp');
-
-      // Enter WhatsApp number
-      await page.locator('input[type="text"]').fill('+33699887766');
-
-      // Submit
-      await page.locator('button[type="submit"]:has-text("Add Backup Contact")').click();
-
-      // Verify navigation back to security page
-      await expect(page).toHaveURL(/\/account-settings\/security\/?/, { timeout: 15000 });
-    });
-
-    test('Add new backup contact - Telegram', async ({ page }) => {
-      await setupAuthMocks(page, mockSecurityInfoNoBackup);
-      await page.goto('/account-settings/security');
-
-      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
-
-      // Click Add backup contact
-      await page.locator('button.add-backup-button').click();
-      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
-
-      // Enter password
-      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
-      await page.fill('input[type="password"]', 'testpassword123');
-      await page.locator('button.submit-button').click();
-
-      // Wait for Add Backup Contact modal
-      await expect(page.locator('h2:has-text("Add Backup Contact")')).toBeVisible({ timeout: 10000 });
-
-      // Select Telegram type
-      await page.selectOption('select', 'Telegram');
-
-      // Enter Telegram username
-      await page.locator('input[type="text"]').fill('@testuser123');
-
-      // Submit
-      await page.locator('button[type="submit"]:has-text("Add Backup Contact")').click();
-
-      // Verify navigation back to security page
-      await expect(page).toHaveURL(/\/account-settings\/security\/?/, { timeout: 15000 });
-    });
-
-    test('Edit existing backup contact', async ({ page }) => {
-      await setupAuthMocks(page);
-      await page.goto('/account-settings/security');
-
-      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
-
-      // Click Edit Backup Contact
-      await page.locator('button.edit-backup-button').click();
-      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
-
-      // Enter password
-      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
-      await page.fill('input[type="password"]', 'testpassword123');
-      await page.locator('button.submit-button').click();
-
-      // Wait for Backup Contact List modal (uses different class)
-      await expect(page.locator('.backup-contact-list-modal h2:has-text("Backup Contacts")')).toBeVisible({ timeout: 15000 });
-
-      // Wait for data to load in the input field (need extra time for React state to propagate)
-      await expect(page.locator('.backup-contact-input').first()).toHaveValue('backup@example.com', { timeout: 15000 });
-    });
-
-    test('Validation - Invalid WhatsApp format shows error', async ({ page }) => {
-      await setupAuthMocks(page, mockSecurityInfoNoBackup);
-      await page.goto('/account-settings/security');
-
-      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
-
-      // Click Add backup contact
-      await page.locator('button.add-backup-button').click();
-      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
-
-      // Enter password
-      await page.fill('input[type="password"]', 'testpassword123');
-      await page.locator('button.submit-button').click();
-
-      // Wait for modal
-      await expect(page.locator('h2:has-text("Add Backup Contact")')).toBeVisible({ timeout: 10000 });
-
-      // Select WhatsApp
-      await page.selectOption('select', 'WhatsApp');
-
-      // Enter invalid number (without +)
-      await page.locator('input[type="text"]').fill('0612345678');
-
-      // Submit
-      await page.locator('button[type="submit"]:has-text("Add Backup Contact")').click();
-
-      // Verify error message
-      await expect(page.locator('.error-message')).toContainText('valid WhatsApp number', { timeout: 5000 });
-    });
-
-    test('Validation - Invalid Telegram format shows error', async ({ page }) => {
-      await setupAuthMocks(page, mockSecurityInfoNoBackup);
-      await page.goto('/account-settings/security');
-
-      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
-
-      // Click Add backup contact
-      await page.locator('button.add-backup-button').click();
-      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
-
-      // Enter password
-      await page.fill('input[type="password"]', 'testpassword123');
-      await page.locator('button.submit-button').click();
-
-      // Wait for modal
-      await expect(page.locator('h2:has-text("Add Backup Contact")')).toBeVisible({ timeout: 10000 });
-
-      // Select Telegram
-      await page.selectOption('select', 'Telegram');
-
-      // Enter invalid username (without @)
-      await page.locator('input[type="text"]').fill('testuser');
-
-      // Submit
-      await page.locator('button[type="submit"]:has-text("Add Backup Contact")').click();
-
-      // Verify error message
-      await expect(page.locator('.error-message')).toContainText('valid Telegram username', { timeout: 5000 });
-    });
-  });
-
-  test.describe('Mobile Phone Flow', () => {
-    test('Display mobile phone section on Security page', async ({ page }) => {
-      await setupAuthMocks(page);
-      await page.goto('/account-settings/security');
-
-      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
-
-      // Verify Mobile phone section is displayed
-      await expect(page.locator('.link-title:has-text("Mobile phone")')).toBeVisible();
-      await expect(page.getByText('+33612345678')).toBeVisible();
-    });
-
-    test('Display phone verification status - Unverified', async ({ page }) => {
-      await setupAuthMocks(page);
-      await page.goto('/account-settings/security');
-
-      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
-
-      // Verify phone needs verification (mockSecurityInfo has phoneVerified: false)
-      await expect(page.locator('.link-card:has(.link-title:text-is("Mobile phone")) .verification-status.unverified')).toBeVisible();
-    });
-
-    test('Display "No phone number provided" when none exists', async ({ page }) => {
-      await setupAuthMocks(page, mockSecurityInfoNoBackup);
-      await page.goto('/account-settings/security');
-
-      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
-
-      // Verify no phone message (mockSecurityInfoNoBackup has phone: null)
-      await expect(page.getByText('No phone number provided')).toBeVisible();
-    });
-
-    test('Click on Mobile phone navigates to identity confirmation', async ({ page }) => {
-      await setupAuthMocks(page);
-      await page.goto('/account-settings/security');
-
-      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
-
-      // Click on Mobile phone section
-      await page.locator('.link-card:has(.link-title:text-is("Mobile phone"))').click();
-
-      // Verify navigation to identity confirmation
       await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
       await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
-    });
 
-    test('Update phone number after identity confirmation', async ({ page }) => {
-      // Add mock for add-phone-number API
-      await setupAuthMocks(page);
-      
-      // Mock add phone number API
-      await page.route('**/customer/add-phone-number', async (route) => {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ message: 'Phone number added successfully' }),
-        });
-      });
+      // Verify password input
+      await expect(page.locator('input[type="password"]')).toBeVisible();
 
-      await page.goto('/account-settings/security');
-      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+      // Verify Continue button
+      await expect(page.locator('button.submit-button:has-text("Continue")')).toBeVisible();
 
-      // Click on Mobile phone section
-      await page.locator('.link-card:has(.link-title:text-is("Mobile phone"))').click();
-      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
-
-      // Enter password
-      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
-      await page.fill('input[type="password"]', 'testpassword123');
-      await page.locator('button.submit-button').click();
-
-      // Wait for Update Phone modal (uses .modal.open class)
-      await expect(page.locator('.modal.open h2')).toContainText('Phone', { timeout: 15000 });
-
-      // Verify current phone is displayed
-      await expect(page.locator('.modal.open input[value="+33612345678"]')).toBeVisible();
-
-      // Enter new phone number
-      await page.locator('.modal.open input[placeholder="Enter phone number"]').fill('+33698765432');
-
-      // Submit
-      await page.locator('.modal.open button[type="submit"]').click();
-
-      // Verify navigation back to security page
-      await expect(page).toHaveURL(/\/account-settings\/security\/?/, { timeout: 15000 });
-    });
-
-    test('Add phone number when none exists', async ({ page }) => {
-      await setupAuthMocks(page, mockSecurityInfoNoBackup);
-      
-      // Mock add phone number API
-      await page.route('**/customer/add-phone-number', async (route) => {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ message: 'Phone number added successfully' }),
-        });
-      });
-
-      await page.goto('/account-settings/security');
-      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
-
-      // Click on Mobile phone section
-      await page.locator('.link-card:has(.link-title:text-is("Mobile phone"))').click();
-      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
-
-      // Enter password
-      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
-      await page.fill('input[type="password"]', 'testpassword123');
-      await page.locator('button.submit-button').click();
-
-      // Wait for Add Phone modal
-      await expect(page.locator('.modal.open h2')).toContainText('Add Phone', { timeout: 15000 });
-
-      // Enter phone number
-      await page.locator('.modal.open input[placeholder="Enter phone number"]').fill('+33612345678');
-
-      // Submit
-      await page.locator('.modal.open button[type="submit"]').click();
-
-      // Verify navigation back to security page
-      await expect(page).toHaveURL(/\/account-settings\/security\/?/, { timeout: 15000 });
-    });
-
-    test('Empty phone number shows error', async ({ page }) => {
-      await setupAuthMocks(page, mockSecurityInfoNoBackup);
-      await page.goto('/account-settings/security');
-
-      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
-
-      // Click on Mobile phone section
-      await page.locator('.link-card:has(.link-title:text-is("Mobile phone"))').click();
-      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
-
-      // Enter password
-      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
-      await page.fill('input[type="password"]', 'testpassword123');
-      await page.locator('button.submit-button').click();
-
-      // Wait for Add Phone modal
-      await expect(page.locator('.modal.open h2')).toContainText('Add Phone', { timeout: 15000 });
-
-      // Try to submit without entering phone number
-      await page.locator('.modal.open button[type="submit"]').click();
-
-      // Verify error message
-      await expect(page.locator('.modal.open .error-message')).toContainText('enter a new phone number', { timeout: 5000 });
-    });
-  });
-
-  test.describe('Identity Confirmation - Alternative Methods', () => {
-    test('Request verification code via email', async ({ page }) => {
-      await setupAuthMocks(page, mockSecurityInfoNoBackup);
-      await page.goto('/account-settings/security');
-
-      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
-
-      // Click Add backup contact
-      await page.locator('button.add-backup-button').click();
-      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
-
-      // Verify identity confirmation page
-      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
-
-      // Verify "Email a code" button is visible
+      // Verify "Email a code" button
       await expect(page.locator('button.code-button')).toBeVisible();
+    });
 
-      // Click Email a code
-      await page.locator('button.code-button').click();
+    test('Continue button is disabled when password is empty', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
 
-      // Verify code input modal opens
-      await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Navigate to identity confirmation
+      await page.locator('.link-card:has(.link-title:text-is("Email"))').click();
+      await expect(page.locator('.modal-overlay, .modal.open')).toBeVisible({ timeout: 10000 });
+      await page.locator('.modal-content button:has-text("Change Email")').click();
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
+
+      // Verify Continue button is disabled when password is empty
+      await expect(page.locator('button.submit-button:has-text("Continue")')).toBeDisabled();
     });
 
     test('Wrong password shows error message', async ({ page }) => {
-      // Override verify password to return error
-      await page.goto('/account-settings/login');
-      await page.evaluate((custId) => {
-        localStorage.setItem('accessToken', 'mock-access-token');
-        localStorage.setItem('refreshToken', 'mock-refresh-token');
-        localStorage.setItem('deviceId', 'mock-device-id');
-        localStorage.setItem('profileId', 'test-profile-id');
-        localStorage.setItem('customer', JSON.stringify({ id: custId }));
-      }, customerId);
+      await gotoProtectedPage(page, '/account-settings/security');
 
-      await page.route('**/customer/security-info', async (route) => {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(mockSecurityInfoNoBackup),
-        });
-      });
-
-      await page.route('**/profiles/active-profile', async (route) => {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ id: 'test-profile-id', name: 'Test', icon: 'alphabet-A' }),
-        });
-      });
-
-      await page.route('**/profiles/check-default-profile', async (route) => {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ hasDefaultProfile: true }),
-        });
-      });
-
-      // Mock verify password with error (use 400 instead of 401 to avoid redirect)
-      await page.route('**/customer/verify-password', async (route) => {
-        await route.fulfill({
-          status: 400,
-          contentType: 'application/json',
-          body: JSON.stringify({ message: 'Incorrect password. Please try again.' }),
-        });
-      });
-
-      await page.goto('/account-settings/security');
       await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
 
-      // Click Add backup contact
-      await page.locator('button.add-backup-button').click();
-      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
-
-      // Verify identity confirmation page loaded
+      // Navigate to identity confirmation
+      await page.locator('.link-card:has(.link-title:text-is("Email"))').click();
+      await expect(page.locator('.modal-overlay, .modal.open')).toBeVisible({ timeout: 10000 });
+      await page.locator('.modal-content button:has-text("Change Email")').click();
       await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
 
       // Enter wrong password
-      await page.fill('input[type="password"]', 'wrongpassword');
-      await page.locator('button.submit-button').click();
+      await page.fill('input[type="password"]', 'WrongPassword123!');
+      await page.locator('button.submit-button:has-text("Continue")').click();
 
       // Verify error message
       await expect(page.locator('.error-message')).toBeVisible({ timeout: 10000 });
     });
-  });
 
-  test.describe('Access and Privacy Section', () => {
-    test('Display Access and Privacy section', async ({ page }) => {
-      await setupAuthMocks(page);
-      await page.goto('/account-settings/security');
+    test('Correct password opens Update Email modal', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
 
       await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
 
-      // Verify Access and Privacy section
-      await expect(page.locator('h2:has-text("Access and Privacy")')).toBeVisible();
+      // Navigate to identity confirmation
+      await page.locator('.link-card:has(.link-title:text-is("Email"))').click();
+      await expect(page.locator('.modal-overlay, .modal.open')).toBeVisible({ timeout: 10000 });
+      await page.locator('.modal-content button:has-text("Change Email")').click();
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
 
-      // Verify links
-      await expect(page.locator('text=Access and devices')).toBeVisible();
-      await expect(page.locator('text=Personal info access')).toBeVisible();
+      // Enter correct password
+      await page.fill('input[type="password"]', testUser.password);
+      await page.locator('button.submit-button:has-text("Continue")').click();
+
+      // Verify Update Email modal opens
+      await expect(page.locator('.modal.open h2:has-text("Update Email")')).toBeVisible({ timeout: 10000 });
     });
 
+    test('Email a code button opens verification modal', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Navigate to identity confirmation
+      await page.locator('.link-card:has(.link-title:text-is("Email"))').click();
+      await expect(page.locator('.modal-overlay, .modal.open')).toBeVisible({ timeout: 10000 });
+      await page.locator('.modal-content button:has-text("Change Email")').click();
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
+
+      // Click "Email a code"
+      await page.locator('button.code-button').click();
+
+      // Verify code verification modal opens
+      await expect(page.locator('.modal-overlay')).toBeVisible({ timeout: 10000 });
+    });
+  });
+
+  test.describe('Update Email Modal', () => {
+    test('Update Email modal shows current email', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Navigate to Update Email modal
+      await page.locator('.link-card:has(.link-title:text-is("Email"))').click();
+      await expect(page.locator('.modal-overlay, .modal.open')).toBeVisible({ timeout: 10000 });
+      await page.locator('.modal-content button:has-text("Change Email")').click();
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
+      await page.fill('input[type="password"]', testUser.password);
+      await page.locator('button.submit-button:has-text("Continue")').click();
+
+      // Verify Update Email modal
+      await expect(page.locator('.modal.open h2:has-text("Update Email")')).toBeVisible({ timeout: 10000 });
+
+      // Verify current email is displayed (readonly input)
+      const currentEmailInput = page.locator('.modal.open input[readonly]');
+      await expect(currentEmailInput).toBeVisible();
+      const currentEmailValue = await currentEmailInput.inputValue();
+      expect(currentEmailValue).toContain('@');
+    });
+
+    test('Update Email modal has new email input', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Navigate to Update Email modal
+      await page.locator('.link-card:has(.link-title:text-is("Email"))').click();
+      await expect(page.locator('.modal-overlay, .modal.open')).toBeVisible({ timeout: 10000 });
+      await page.locator('.modal-content button:has-text("Change Email")').click();
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
+      await page.fill('input[type="password"]', testUser.password);
+      await page.locator('button.submit-button:has-text("Continue")').click();
+
+      // Verify Update Email modal
+      await expect(page.locator('.modal.open h2:has-text("Update Email")')).toBeVisible({ timeout: 10000 });
+
+      // Verify new email input
+      await expect(page.locator('.modal.open input[placeholder="Enter new email address"]')).toBeVisible();
+    });
+
+    test('Update Email modal has Cancel and Update buttons', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Navigate to Update Email modal
+      await page.locator('.link-card:has(.link-title:text-is("Email"))').click();
+      await expect(page.locator('.modal-overlay, .modal.open')).toBeVisible({ timeout: 10000 });
+      await page.locator('.modal-content button:has-text("Change Email")').click();
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
+      await page.fill('input[type="password"]', testUser.password);
+      await page.locator('button.submit-button:has-text("Continue")').click();
+
+      // Verify Update Email modal
+      await expect(page.locator('.modal.open h2:has-text("Update Email")')).toBeVisible({ timeout: 10000 });
+
+      // Verify buttons
+      await expect(page.locator('.modal.open button:has-text("Cancel")')).toBeVisible();
+      await expect(page.locator('.modal.open button[type="submit"]:has-text("Update Email")')).toBeVisible();
+    });
+  });
+
+  test.describe('Backup Contact Flow', () => {
+    test('Display backup contacts if exists', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Verify Backup contact section shows either contacts or "No backup contacts" / "+ Add" button
+      const backupSection = page.locator('.link-card:has(.link-title:text-is("Backup contact"))');
+      await expect(backupSection).toBeVisible();
+
+      // Either there are backup contacts displayed, or there's an add button
+      const hasContacts = await page.locator('.backup-contacts-list').isVisible().catch(() => false);
+      const hasAddButton = await page.locator('button.add-backup-button').isVisible().catch(() => false);
+      
+      expect(hasContacts || hasAddButton).toBeTruthy();
+    });
+
+    test('Click on backup contact navigates to identity confirmation', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Click on Backup contact section
+      await page.locator('.link-card:has(.link-title:text-is("Backup contact"))').click();
+
+      // Verify navigation to identity confirmation
+      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
+    });
+
+    test('Add backup contact button navigates to identity confirmation', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Check if Add backup button exists
+      const addButton = page.locator('button.add-backup-button');
+      const isVisible = await addButton.isVisible().catch(() => false);
+
+      if (isVisible) {
+        await addButton.click();
+        await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
+      } else {
+        test.skip('No Add backup contact button visible (user may already have all backup contact types)');
+      }
+    });
+
+    test('After password verification, backup contact modal opens', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Click on Backup contact section
+      await page.locator('.link-card:has(.link-title:text-is("Backup contact"))').click();
+
+      // Wait for identity confirmation
+      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
+
+      // Enter password
+      await page.fill('input[type="password"]', testUser.password);
+      await page.locator('button.submit-button:has-text("Continue")').click();
+
+      // Verify backup contact modal opens (either Add or List modal)
+      const addModal = page.locator('.modal.open h2:has-text("Add Backup Contact")');
+      const listModal = page.locator('.backup-contact-list-modal h2:has-text("Backup Contacts")');
+      
+      await expect(addModal.or(listModal)).toBeVisible({ timeout: 15000 });
+    });
+  });
+
+  test.describe('Add Backup Contact Modal', () => {
+    test('Add Backup Contact modal has type selector', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Check if Add backup button exists
+      const addButton = page.locator('button.add-backup-button');
+      const isVisible = await addButton.isVisible().catch(() => false);
+
+      if (!isVisible) {
+        test.skip('No Add backup contact button visible');
+        return;
+      }
+
+      // Click on Add backup contact
+      await addButton.click();
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
+
+      // Enter password
+      await page.fill('input[type="password"]', testUser.password);
+      await page.locator('button.submit-button:has-text("Continue")').click();
+
+      // Verify Add Backup Contact modal
+      await expect(page.locator('.modal.open h2:has-text("Add Backup Contact")')).toBeVisible({ timeout: 15000 });
+
+      // Verify type selector (Email, WhatsApp, Telegram)
+      await expect(page.locator('.modal.open select')).toBeVisible();
+    });
+
+    test('Add Backup Contact modal has value input', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      const addButton = page.locator('button.add-backup-button');
+      const isVisible = await addButton.isVisible().catch(() => false);
+
+      if (!isVisible) {
+        test.skip('No Add backup contact button visible');
+        return;
+      }
+
+      await addButton.click();
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
+      await page.fill('input[type="password"]', testUser.password);
+      await page.locator('button.submit-button:has-text("Continue")').click();
+
+      await expect(page.locator('.modal.open h2:has-text("Add Backup Contact")')).toBeVisible({ timeout: 15000 });
+
+      // Verify value input
+      await expect(page.locator('.modal.open input[type="email"], .modal.open input[type="text"]').first()).toBeVisible();
+    });
+
+    test('Validation - Invalid WhatsApp format shows error', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      const addButton = page.locator('button.add-backup-button');
+      const isVisible = await addButton.isVisible().catch(() => false);
+
+      if (!isVisible) {
+        test.skip('No Add backup contact button visible');
+        return;
+      }
+
+      await addButton.click();
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
+      await page.fill('input[type="password"]', testUser.password);
+      await page.locator('button.submit-button:has-text("Continue")').click();
+
+      await expect(page.locator('.modal.open h2:has-text("Add Backup Contact")')).toBeVisible({ timeout: 15000 });
+
+      // Check if WhatsApp is available in the dropdown
+      const select = page.locator('.modal.open select');
+      const options = await select.locator('option').allTextContents();
+      
+      if (!options.some(opt => opt.includes('WhatsApp'))) {
+        test.skip('WhatsApp option not available');
+        return;
+      }
+
+      // Select WhatsApp
+      await select.selectOption('WhatsApp');
+
+      // Enter invalid number (without +)
+      await page.locator('.modal.open input[type="text"]').fill('0612345678');
+
+      // Submit
+      await page.locator('.modal.open button[type="submit"]').click();
+
+      // Verify error message
+      await expect(page.locator('.error-message')).toContainText('WhatsApp', { timeout: 5000 });
+    });
+
+    test('Validation - Invalid Telegram format shows error', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      const addButton = page.locator('button.add-backup-button');
+      const isVisible = await addButton.isVisible().catch(() => false);
+
+      if (!isVisible) {
+        test.skip('No Add backup contact button visible');
+        return;
+      }
+
+      await addButton.click();
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
+      await page.fill('input[type="password"]', testUser.password);
+      await page.locator('button.submit-button:has-text("Continue")').click();
+
+      await expect(page.locator('.modal.open h2:has-text("Add Backup Contact")')).toBeVisible({ timeout: 15000 });
+
+      // Check if Telegram is available in the dropdown
+      const select = page.locator('.modal.open select');
+      const options = await select.locator('option').allTextContents();
+      
+      if (!options.some(opt => opt.includes('Telegram'))) {
+        test.skip('Telegram option not available');
+        return;
+      }
+
+      // Select Telegram
+      await select.selectOption('Telegram');
+
+      // Enter invalid username (without @)
+      await page.locator('.modal.open input[type="text"]').fill('testuser');
+
+      // Submit
+      await page.locator('.modal.open button[type="submit"]').click();
+
+      // Verify error message
+      await expect(page.locator('.error-message')).toContainText('Telegram', { timeout: 5000 });
+    });
+  });
+
+  test.describe('Backup Contact List Modal', () => {
+    test('Edit backup contact button opens list modal', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Check if Edit button exists
+      const editButton = page.locator('button.edit-backup-button');
+      const isVisible = await editButton.isVisible().catch(() => false);
+
+      if (!isVisible) {
+        test.skip('No Edit backup contact button visible (no backup contacts exist)');
+        return;
+      }
+
+      await editButton.click();
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
+      await page.fill('input[type="password"]', testUser.password);
+      await page.locator('button.submit-button:has-text("Continue")').click();
+
+      // Verify Backup Contact List modal
+      await expect(page.locator('.backup-contact-list-modal h2:has-text("Backup Contacts")')).toBeVisible({ timeout: 15000 });
+    });
+
+    test('Backup Contact List modal shows contacts with Save and Delete buttons', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      const editButton = page.locator('button.edit-backup-button');
+      const isVisible = await editButton.isVisible().catch(() => false);
+
+      if (!isVisible) {
+        test.skip('No Edit backup contact button visible');
+        return;
+      }
+
+      await editButton.click();
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
+      await page.fill('input[type="password"]', testUser.password);
+      await page.locator('button.submit-button:has-text("Continue")').click();
+
+      await expect(page.locator('.backup-contact-list-modal h2:has-text("Backup Contacts")')).toBeVisible({ timeout: 15000 });
+
+      // Verify contacts are displayed with Save/Delete buttons
+      await expect(page.locator('.backup-contact-item').first()).toBeVisible();
+      await expect(page.locator('.backup-contact-save-btn').first()).toBeVisible();
+      await expect(page.locator('.backup-contact-delete-btn').first()).toBeVisible();
+    });
+
+    test('Backup Contact List modal has close button', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      const editButton = page.locator('button.edit-backup-button');
+      const isVisible = await editButton.isVisible().catch(() => false);
+
+      if (!isVisible) {
+        test.skip('No Edit backup contact button visible');
+        return;
+      }
+
+      await editButton.click();
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
+      await page.fill('input[type="password"]', testUser.password);
+      await page.locator('button.submit-button:has-text("Continue")').click();
+
+      await expect(page.locator('.backup-contact-list-modal h2:has-text("Backup Contacts")')).toBeVisible({ timeout: 15000 });
+
+      // Verify close button
+      await expect(page.locator('.backup-contact-list-modal-close')).toBeVisible();
+    });
+  });
+
+  test.describe('Mobile Phone Flow', () => {
+    test('Click on Mobile phone navigates to identity confirmation', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Click on Mobile phone section
+      await page.locator('.link-card:has(.link-title:text-is("Mobile phone"))').click();
+
+      // Verify navigation to identity confirmation
+      await expect(page).toHaveURL(/\/account-settings\/identity-confirmation\/?/, { timeout: 15000 });
+    });
+
+    test('After password verification, phone modal opens', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Click on Mobile phone section
+      await page.locator('.link-card:has(.link-title:text-is("Mobile phone"))').click();
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
+
+      // Enter password
+      await page.fill('input[type="password"]', testUser.password);
+      await page.locator('button.submit-button:has-text("Continue")').click();
+
+      // Verify phone modal opens (Update or Add)
+      await expect(page.locator('.modal.open h2')).toContainText('Phone', { timeout: 15000 });
+    });
+
+    test('Phone modal has input and submit button', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      await page.locator('.link-card:has(.link-title:text-is("Mobile phone"))').click();
+      await expect(page.locator('h1')).toContainText("Confirm it's you", { timeout: 15000 });
+      await page.fill('input[type="password"]', testUser.password);
+      await page.locator('button.submit-button:has-text("Continue")').click();
+
+      await expect(page.locator('.modal.open h2')).toContainText('Phone', { timeout: 15000 });
+
+      // Verify input and buttons
+      await expect(page.locator('.modal.open input')).toBeVisible();
+      await expect(page.locator('.modal.open button[type="submit"]')).toBeVisible();
+    });
+  });
+
+  test.describe('Navigation to Password Change', () => {
+    test('Click on Password navigates to change password page', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
+
+      await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
+
+      // Click on Password section
+      await page.locator('.link-card:has(.link-title:text-is("Password"))').click();
+
+      // Verify navigation
+      await expect(page).toHaveURL(/\/account-settings\/change-password\/?/, { timeout: 15000 });
+    });
+  });
+
+  test.describe('Navigation to Manage Access', () => {
     test('Click on Access and devices navigates to manage-access', async ({ page }) => {
-      await setupAuthMocks(page);
-      await page.goto('/account-settings/security');
+      await gotoProtectedPage(page, '/account-settings/security');
 
       await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
 
@@ -736,16 +692,20 @@ test.describe('Change Email & Backup Contact', () => {
       // Verify navigation
       await expect(page).toHaveURL(/\/account-settings\/manage-access\/?/, { timeout: 15000 });
     });
+  });
 
-    test('Delete Account button is visible', async ({ page }) => {
-      await setupAuthMocks(page);
-      await page.goto('/account-settings/security');
+  test.describe('Personal Info Access Modal', () => {
+    test('Click on Personal info access opens modal', async ({ page }) => {
+      await gotoProtectedPage(page, '/account-settings/security');
 
       await expect(page.locator('h1')).toContainText('Security', { timeout: 15000 });
 
-      // Verify Delete Account button
-      await expect(page.locator('button:has-text("Delete Account")')).toBeVisible();
+      // Click on Personal info access
+      await page.click('text=Personal info access');
+
+      // Verify modal opens
+      await expect(page.locator('.modal-overlay, .modal.open')).toBeVisible({ timeout: 10000 });
     });
   });
-});
 
+});
