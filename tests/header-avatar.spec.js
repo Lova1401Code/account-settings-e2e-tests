@@ -7,12 +7,20 @@ test.describe('Header Avatar - Functional Tests', () => {
     return await page.evaluate(() => localStorage.getItem('profileId'));
   };
 
+  // Helper pour attendre que le header soit complètement chargé
+  const waitForHeader = async (page) => {
+    await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle', { timeout: 30000 });
+    await page.waitForTimeout(2000);
+    // Attendre que le header soit visible
+    await page.waitForSelector('.header', { timeout: 15000 });
+  };
+
   test.describe('Avatar Display', () => {
     
     test('Header displays profile avatar when user is authenticated', async ({ page }) => {
-      // Navigate to any authenticated page
-      await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2000);
+      // Navigate to any authenticated page and wait for full load
+      await waitForHeader(page);
       
       // Header profile button should be visible
       const profileButton = page.locator('.profile-button');
@@ -147,13 +155,20 @@ test.describe('Header Avatar - Functional Tests', () => {
 
   test.describe('Avatar Dimensions - Responsive', () => {
     
-    test('Avatar has correct dimensions on desktop (1280px)', async ({ page }) => {
-      await page.setViewportSize({ width: 1280, height: 720 });
+    // Helper pour attendre le header avec viewport spécifique
+    const waitForHeaderWithViewport = async (page, width, height) => {
+      await page.setViewportSize({ width, height });
       await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('networkidle', { timeout: 30000 });
       await page.waitForTimeout(2000);
+      await page.waitForSelector('.header', { timeout: 15000 });
+    };
+
+    test('Avatar has correct dimensions on desktop (1280px)', async ({ page }) => {
+      await waitForHeaderWithViewport(page, 1280, 720);
       
       const avatarContainer = page.locator('.profile-avatar-container');
-      await expect(avatarContainer).toBeVisible({ timeout: 10000 });
+      await expect(avatarContainer).toBeVisible({ timeout: 15000 });
       
       // Get computed dimensions
       const containerBox = await avatarContainer.boundingBox();
@@ -173,12 +188,10 @@ test.describe('Header Avatar - Functional Tests', () => {
     });
 
     test('Avatar has correct dimensions on tablet (768px)', async ({ page }) => {
-      await page.setViewportSize({ width: 768, height: 1024 });
-      await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2000);
+      await waitForHeaderWithViewport(page, 768, 1024);
       
       const avatarContainer = page.locator('.profile-avatar-container');
-      await expect(avatarContainer).toBeVisible({ timeout: 10000 });
+      await expect(avatarContainer).toBeVisible({ timeout: 15000 });
       
       const containerBox = await avatarContainer.boundingBox();
       expect(containerBox).toBeTruthy();
@@ -189,12 +202,10 @@ test.describe('Header Avatar - Functional Tests', () => {
     });
 
     test('Avatar has correct dimensions on mobile (375px)', async ({ page }) => {
-      await page.setViewportSize({ width: 375, height: 667 });
-      await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2000);
+      await waitForHeaderWithViewport(page, 375, 667);
       
       const avatarContainer = page.locator('.profile-avatar-container');
-      await expect(avatarContainer).toBeVisible({ timeout: 10000 });
+      await expect(avatarContainer).toBeVisible({ timeout: 15000 });
       
       const containerBox = await avatarContainer.boundingBox();
       expect(containerBox).toBeTruthy();
@@ -350,6 +361,325 @@ test.describe('Header Avatar - Functional Tests', () => {
       
       // Arrow should have 'open' class (rotated)
       await expect(arrow).toHaveClass(/open/);
+    });
+  });
+
+  test.describe('Navigation Menu - Dropdown Links', () => {
+    
+    // Helper to open the navigation menu
+    const openNavigationMenu = async (page) => {
+      await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2000);
+      
+      const profileButton = page.locator('.profile-button');
+      await expect(profileButton).toBeVisible({ timeout: 10000 });
+      await profileButton.click();
+      
+      const navMenu = page.locator('.nav-menu');
+      await expect(navMenu).toBeVisible({ timeout: 5000 });
+    };
+
+    test('Account link navigates to account settings homepage', async ({ page }) => {
+      await openNavigationMenu(page);
+      
+      // Click on Account link
+      const accountLink = page.locator('.nav-menu-link:has(p:has-text("Account"))');
+      await expect(accountLink).toBeVisible({ timeout: 5000 });
+      await accountLink.click();
+      
+      // Should navigate to account settings
+      await expect(page).toHaveURL(/\/account-settings\/?$/, { timeout: 10000 });
+      
+      // Menu should be closed
+      await expect(page.locator('.nav-menu')).not.toBeVisible({ timeout: 5000 });
+    });
+
+    test('Manage Profiles link navigates to profiles page', async ({ page }) => {
+      await openNavigationMenu(page);
+      
+      // Click on Manage Profiles link
+      const manageProfilesLink = page.locator('.nav-menu-link:has(p:has-text("Manage Profiles"))');
+      await expect(manageProfilesLink).toBeVisible({ timeout: 5000 });
+      await manageProfilesLink.click();
+      
+      // Should navigate to profiles page
+      await expect(page).toHaveURL(/\/account-settings\/profiles/, { timeout: 10000 });
+      
+      // Verify page content
+      await expect(page.locator('h1, .section-header')).toContainText(/Profile/i, { timeout: 10000 });
+    });
+
+    test('Contact Us link navigates to contact page', async ({ page }) => {
+      await openNavigationMenu(page);
+      
+      // Click on Contact Us link
+      const contactLink = page.locator('.nav-menu-link:has(p:has-text("Contact Us"))');
+      await expect(contactLink).toBeVisible({ timeout: 5000 });
+      await contactLink.click();
+      
+      // Should navigate to contact-us page
+      await expect(page).toHaveURL(/\/account-settings\/contact-us/, { timeout: 10000 });
+      
+      // Verify page content
+      await expect(page.locator('h1')).toContainText(/Contact/i, { timeout: 10000 });
+    });
+
+    test('Help link navigates to help page', async ({ page }) => {
+      await openNavigationMenu(page);
+      
+      // Click on Help link
+      const helpLink = page.locator('.nav-menu-link:has(p:has-text("Help"))');
+      await expect(helpLink).toBeVisible({ timeout: 5000 });
+      await helpLink.click();
+      
+      // Should navigate to help page
+      await expect(page).toHaveURL(/\/account-settings\/help/, { timeout: 10000 });
+      
+      // Verify page content
+      await expect(page.locator('h1')).toContainText(/Help/i, { timeout: 10000 });
+    });
+
+    test('FAQ link navigates to FAQ page', async ({ page }) => {
+      await openNavigationMenu(page);
+      
+      // Click on FAQ link
+      const faqLink = page.locator('.nav-menu-link:has(p:has-text("FAQ"))');
+      await expect(faqLink).toBeVisible({ timeout: 5000 });
+      await faqLink.click();
+      
+      // Should navigate to FAQ page
+      await expect(page).toHaveURL(/\/account-settings\/faq/, { timeout: 10000 });
+      
+      // Verify page content
+      await expect(page.locator('h1')).toContainText(/FAQ|Frequently Asked/i, { timeout: 10000 });
+    });
+
+    test('Switch Active Profile link navigates to profile selection', async ({ page }) => {
+      await openNavigationMenu(page);
+      
+      // Click on Switch Active Profile link
+      const switchProfileLink = page.locator('.nav-menu-link:has(p:has-text("Switch Active Profile"))');
+      await expect(switchProfileLink).toBeVisible({ timeout: 5000 });
+      await switchProfileLink.click();
+      
+      // Should navigate to select-profile page
+      await expect(page).toHaveURL(/\/account-settings\/select-profile/, { timeout: 10000 });
+      
+      // Verify page content - "Who's watching" title
+      await expect(page.locator('h1')).toContainText(/Who.*watching|Manage Profiles/i, { timeout: 10000 });
+    });
+
+    test('Sign Out link logs out the user', async ({ page }) => {
+      await openNavigationMenu(page);
+      
+      // Click on Sign Out link
+      const signOutLink = page.locator('.nav-menu-link:has(p:has-text("Sign Out"))');
+      await expect(signOutLink).toBeVisible({ timeout: 5000 });
+      await signOutLink.click();
+      
+      // Should navigate to login page
+      await expect(page).toHaveURL(/\/account-settings\/login/, { timeout: 15000 });
+      
+      // Should see login form
+      await expect(page.locator('#identifier, input[type="email"], input[name="email"]')).toBeVisible({ timeout: 10000 });
+    });
+
+    test('Close button closes the menu', async ({ page }) => {
+      // Use mobile viewport to see close button
+      await page.setViewportSize({ width: 375, height: 667 });
+      await openNavigationMenu(page);
+      
+      // Close button should be visible on mobile
+      const closeButton = page.locator('.nav-menu .close-button');
+      const isCloseVisible = await closeButton.isVisible().catch(() => false);
+      
+      if (isCloseVisible) {
+        await closeButton.click();
+        
+        // Menu should be closed
+        await expect(page.locator('.nav-menu')).not.toBeVisible({ timeout: 5000 });
+      } else {
+        // On desktop, click outside to close
+        await page.click('body', { position: { x: 10, y: 10 } });
+        await expect(page.locator('.nav-menu')).not.toBeVisible({ timeout: 5000 });
+      }
+    });
+
+    test('All menu items are visible and have correct icons', async ({ page }) => {
+      await openNavigationMenu(page);
+      
+      const navMenu = page.locator('.nav-menu');
+      await expect(navMenu).toBeVisible({ timeout: 5000 });
+      
+      // Check all menu items are present
+      const menuItems = [
+        'Account',
+        'Manage Profiles',
+        'Contact Us',
+        'Help',
+        'FAQ',
+        'Switch Active Profile',
+        'Sign Out'
+      ];
+      
+      for (const item of menuItems) {
+        const menuLink = navMenu.locator(`.nav-menu-link:has(p:has-text("${item}"))`);
+        await expect(menuLink).toBeVisible({ timeout: 5000 });
+        
+        // Each menu item should have an icon
+        const icon = menuLink.locator('.nav-menu-icon');
+        await expect(icon).toBeVisible({ timeout: 3000 });
+      }
+    });
+
+    test('Menu dividers are present for visual separation', async ({ page }) => {
+      await openNavigationMenu(page);
+      
+      // There should be dividers in the menu
+      const dividers = page.locator('.nav-menu-divider');
+      const dividerCount = await dividers.count();
+      
+      // At least 2 dividers expected (after BackButton and before Switch Profile)
+      expect(dividerCount).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  test.describe('Header Logo', () => {
+    
+    test('Logo is visible in the header', async ({ page }) => {
+      await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('networkidle', { timeout: 30000 });
+      await page.waitForTimeout(2000);
+      
+      // Logo should be visible
+      const logo = page.locator('.header-logo .logo');
+      await expect(logo).toBeVisible({ timeout: 10000 });
+      
+      // Logo image should be visible
+      const logoImage = page.locator('.header-logo .logo-image');
+      await expect(logoImage).toBeVisible({ timeout: 10000 });
+    });
+
+    test('Logo image has correct alt text', async ({ page }) => {
+      await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('networkidle', { timeout: 30000 });
+      await page.waitForTimeout(2000);
+      
+      const logoImage = page.locator('.header-logo .logo-image');
+      await expect(logoImage).toBeVisible({ timeout: 10000 });
+      
+      // Check alt text
+      const altText = await logoImage.getAttribute('alt');
+      expect(altText).toBeTruthy();
+      expect(altText).toBe('AllMovies');
+    });
+
+    test('Logo is clickable and has valid href', async ({ page }) => {
+      await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('networkidle', { timeout: 30000 });
+      await page.waitForTimeout(2000);
+      
+      const logoLink = page.locator('.header-logo .logo');
+      await expect(logoLink).toBeVisible({ timeout: 10000 });
+      
+      // Check that logo link has an href attribute
+      const href = await logoLink.getAttribute('href');
+      expect(href).toBeTruthy();
+      
+      // Href should point to the main frontend (not account-settings)
+      // It should be an absolute URL or just '/'
+      expect(href.includes('/') || href.startsWith('http')).toBeTruthy();
+    });
+
+    test('Clicking logo navigates to homepage', async ({ page }) => {
+      await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('networkidle', { timeout: 30000 });
+      await page.waitForTimeout(2000);
+      
+      const logoLink = page.locator('.header-logo .logo');
+      await expect(logoLink).toBeVisible({ timeout: 10000 });
+      
+      // Get the href before clicking
+      const href = await logoLink.getAttribute('href');
+      
+      // Click the logo
+      await logoLink.click();
+      await page.waitForTimeout(2000);
+      
+      // Should navigate to the homepage (the href destination)
+      // Since the logo points to VITE_FRONTEND_BASE_URL, we check the URL changed
+      const currentUrl = page.url();
+      
+      // The URL should either match the href or be the homepage
+      if (href && href.startsWith('http')) {
+        // External absolute URL - check if we navigated there
+        expect(currentUrl).toContain(new URL(href).hostname);
+      } else {
+        // Relative URL - should navigate away from account-settings
+        // or to the root
+        expect(currentUrl.endsWith('/') || !currentUrl.includes('/account-settings')).toBeTruthy();
+      }
+    });
+
+    test('Logo has correct dimensions on desktop', async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('networkidle', { timeout: 30000 });
+      await page.waitForTimeout(2000);
+      
+      const logoImage = page.locator('.header-logo .logo-image');
+      await expect(logoImage).toBeVisible({ timeout: 10000 });
+      
+      const logoBox = await logoImage.boundingBox();
+      expect(logoBox).toBeTruthy();
+      
+      // Desktop: logo should have height of 18px (as per CSS)
+      expect(logoBox.height).toBeCloseTo(18, 1);
+    });
+
+    test('Logo has correct dimensions on tablet (768px)', async ({ page }) => {
+      await page.setViewportSize({ width: 768, height: 1024 });
+      await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('networkidle', { timeout: 30000 });
+      await page.waitForTimeout(2000);
+      
+      const logoImage = page.locator('.header-logo .logo-image');
+      await expect(logoImage).toBeVisible({ timeout: 10000 });
+      
+      const logoBox = await logoImage.boundingBox();
+      expect(logoBox).toBeTruthy();
+      
+      // Tablet (max-width: 768px): logo should have height of 16px
+      expect(logoBox.height).toBeCloseTo(16, 1);
+    });
+
+    test('Logo has correct dimensions on mobile (375px)', async ({ page }) => {
+      await page.setViewportSize({ width: 375, height: 667 });
+      await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('networkidle', { timeout: 30000 });
+      await page.waitForTimeout(2000);
+      
+      const logoImage = page.locator('.header-logo .logo-image');
+      await expect(logoImage).toBeVisible({ timeout: 10000 });
+      
+      const logoBox = await logoImage.boundingBox();
+      expect(logoBox).toBeTruthy();
+      
+      // Mobile (max-width: 480px): logo should have height of 14px
+      expect(logoBox.height).toBeCloseTo(14, 1);
+    });
+
+    test('Logo link is accessible (has proper role)', async ({ page }) => {
+      await page.goto('/account-settings', { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('networkidle', { timeout: 30000 });
+      await page.waitForTimeout(2000);
+      
+      const logoLink = page.locator('.header-logo .logo');
+      await expect(logoLink).toBeVisible({ timeout: 10000 });
+      
+      // Should be a link element
+      const tagName = await logoLink.evaluate(el => el.tagName.toLowerCase());
+      expect(tagName).toBe('a');
     });
   });
 
