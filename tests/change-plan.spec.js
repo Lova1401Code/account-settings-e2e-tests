@@ -50,7 +50,7 @@ test.describe('Change Plan - Functional Tests', () => {
   test('Navigate from Membership to Change Plan shows current plan marked', async ({ page }) => {
     // Start from membership page
     await page.goto('/account-settings/membership', { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: 30000 });
+    await page.waitForLoadState('load', { timeout: 30000 });
     
     // Check if plan card exists (customer has a subscription)
     const planCard = page.locator('.plan-card .link-card');

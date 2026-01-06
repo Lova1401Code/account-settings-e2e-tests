@@ -5,8 +5,7 @@ test.describe('Overview Page - Functional Tests', () => {
   // Helper pour attendre que la page Overview soit complètement chargée
   const waitForOverviewPage = async (page) => {
     await page.goto('/account-settings/', { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: 30000 });
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('load', { timeout: 30000 });
     await expect(page.locator('h1')).toContainText('Overview', { timeout: 15000 });
   };
 
@@ -111,9 +110,14 @@ test.describe('Overview Page - Functional Tests', () => {
       ];
 
       for (const link of sidebarLinks) {
-        await waitForOverviewPage(page);
-        await page.locator(`.sidebar-item:has-text("${link.name}")`).click();
-        await expect(page).toHaveURL(link.url, { timeout: 10000 });
+        // Navigation directe au lieu de recharger la page entière
+        await page.goto('/account-settings/', { waitUntil: 'load' });
+        await expect(page.locator('h1')).toContainText('Overview', { timeout: 10000 });
+        
+        const sidebarItem = page.locator(`.sidebar-item:has-text("${link.name}")`);
+        await expect(sidebarItem).toBeVisible({ timeout: 5000 });
+        await sidebarItem.click();
+        await expect(page).toHaveURL(link.url, { timeout: 15000 });
       }
     });
   });

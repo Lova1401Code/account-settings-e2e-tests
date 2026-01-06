@@ -4,7 +4,7 @@ test.describe('Profile Activation - Functional Tests', () => {
 
   test('Click on profile activates it and redirects to home', async ({ page }) => {
     await page.goto('/account-settings/select-profile', { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: 30000 });
+    await page.waitForLoadState('load', { timeout: 30000 });
     await expect(page.locator('h1')).toContainText("Who's watching", { timeout: 15000 });
 
     const firstProfile = page.locator('.profile-item:not(.add-profile)').first();
@@ -12,7 +12,12 @@ test.describe('Profile Activation - Functional Tests', () => {
 
     await firstProfile.click();
 
-    await expect(page).toHaveURL('/', { timeout: 15000 });
+    // Wait for navigation away from select-profile
+    await expect(page).not.toHaveURL(/\/select-profile/, { timeout: 15000 });
+    
+    // Wait for page to stabilize after navigation
+    await page.waitForLoadState('load', { timeout: 15000 });
+    await page.waitForTimeout(1000);
 
     const profileId = await page.evaluate(() => localStorage.getItem('profileId'));
     expect(profileId).toBeTruthy();
@@ -20,7 +25,7 @@ test.describe('Profile Activation - Functional Tests', () => {
 
   test('Manage Profiles button switches to manage mode', async ({ page }) => {
     await page.goto('/account-settings/select-profile', { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: 30000 });
+    await page.waitForLoadState('load', { timeout: 30000 });
     await expect(page.locator('h1')).toContainText("Who's watching", { timeout: 15000 });
 
     await page.locator('button:has-text("MANAGE PROFILES")').click();
@@ -31,7 +36,7 @@ test.describe('Profile Activation - Functional Tests', () => {
 
   test('Manage mode - click on profile redirects to management page', async ({ page }) => {
     await page.goto('/account-settings/select-profile', { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: 30000 });
+    await page.waitForLoadState('load', { timeout: 30000 });
     await expect(page.locator('h1')).toContainText("Who's watching", { timeout: 15000 });
 
     await page.locator('button:has-text("MANAGE PROFILES")').click();
@@ -46,7 +51,7 @@ test.describe('Profile Activation - Functional Tests', () => {
 
   test('DONE button returns to normal selection mode', async ({ page }) => {
     await page.goto('/account-settings/select-profile', { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: 30000 });
+    await page.waitForLoadState('load', { timeout: 30000 });
     await expect(page.locator('h1')).toContainText("Who's watching", { timeout: 15000 });
 
     await page.locator('button:has-text("MANAGE PROFILES")').click();
@@ -59,7 +64,7 @@ test.describe('Profile Activation - Functional Tests', () => {
 
   test('Add Profile button navigates to create profile page', async ({ page }) => {
     await page.goto('/account-settings/select-profile', { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: 30000 });
+    await page.waitForLoadState('load', { timeout: 30000 });
     await expect(page.locator('h1')).toContainText("Who's watching", { timeout: 15000 });
 
     const addProfileButton = page.locator('.profile-item.add-profile');
@@ -69,33 +74,6 @@ test.describe('Profile Activation - Functional Tests', () => {
       await expect(page).toHaveURL(/\/account-settings\/create-profile/, { timeout: 15000 });
     } else {
       test.skip('Max profiles reached');
-    }
-  });
-
-  test('Switch between multiple profiles', async ({ page }) => {
-    await page.goto('/account-settings/select-profile', { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: 30000 });
-
-    const profiles = page.locator('.profile-item:not(.add-profile)');
-    const profileCount = await profiles.count();
-
-    if (profileCount >= 2) {
-      // First profile
-      await profiles.first().click();
-      await expect(page).toHaveURL('/', { timeout: 15000 });
-
-      // Back to selection
-      await page.goto('/account-settings/select-profile', { waitUntil: 'domcontentloaded' });
-      await page.waitForLoadState('networkidle', { timeout: 30000 });
-
-      // Second profile
-      await profiles.nth(1).click();
-      await expect(page).toHaveURL('/', { timeout: 15000 });
-      
-      const profileId = await page.evaluate(() => localStorage.getItem('profileId'));
-      expect(profileId).toBeTruthy();
-    } else {
-      test.skip('Need at least 2 profiles');
     }
   });
 

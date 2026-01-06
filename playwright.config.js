@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test';
 
-// Configuration flexible via variables d'environnement
+// Configuration flexible via variables d'environnement https://www.allmovies2a.dev/
 const baseURL = process.env.BASE_URL || 'https://www.allmovies2a.dev/';
 
 export default defineConfig({
@@ -31,6 +31,13 @@ export default defineConfig({
       name: 'setup',
       testMatch: /auth\.setup\.js/,
     },
+    // Projet pour les tests SANS authentification (signup, signin, forgot-password)
+    {
+      name: 'no-auth',
+      testMatch: /signup\.spec\.js|signin\.spec\.js|forgot-password\.spec\.js/,
+      // Pas de storageState = pas d'authentification
+      // Pas de dependencies = ne dépend pas du setup
+    },
     // Projet principal : utilise la session authentifiée
     {
       name: 'chromium',
@@ -38,7 +45,7 @@ export default defineConfig({
         storageState: '.auth/user.json',
       },
       dependencies: ['setup'],
-      testIgnore: /auth\.setup\.js/,
+      testIgnore: /auth\.setup\.js|signup\.spec\.js|signin\.spec\.js|forgot-password\.spec\.js/,
     },
   ],
 });

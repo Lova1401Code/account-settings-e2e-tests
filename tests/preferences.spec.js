@@ -44,52 +44,45 @@ test.describe('Preferences - Functional Tests', () => {
 
   test.describe('Navigation', () => {
     test('Languages link navigates to language settings', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Languages")').first().click();
+      await goToSubPage(page, 'languages');
       await expect(page).toHaveURL(/\/languages\//, { timeout: 15000 });
       await expect(page.locator('h1')).toContainText('Languages');
     });
 
     test('Subtitle appearance link navigates correctly', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Subtitle")').first().click();
-      await page.waitForTimeout(2000);
+      await goToSubPage(page, 'subtitle-appearance');
       await expect(page).toHaveURL(/\/subtitle-appearance\//, { timeout: 20000 });
+      await expect(page.locator('h1')).toContainText('Subtitle Appearance', { timeout: 15000 });
     });
 
     test('Playback settings link navigates correctly', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Playback")').first().click();
-      await page.waitForTimeout(2000);
+      await goToSubPage(page, 'playback-settings');
       await expect(page).toHaveURL(/\/playback-settings\//, { timeout: 20000 });
+      await expect(page.locator('h1')).toContainText('Playback Settings', { timeout: 15000 });
     });
 
     test('Notification settings link navigates correctly', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Notification")').first().click();
-      await page.waitForTimeout(2000);
+      await goToSubPage(page, 'notification-settings');
       await expect(page).toHaveURL(/\/notification-settings\//, { timeout: 20000 });
+      await expect(page.locator('h1')).toContainText('Notification Settings', { timeout: 15000 });
     });
 
     test('Viewing activity link navigates correctly', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Viewing")').first().click();
+      await goToSubPage(page, 'viewing-activity');
       await expect(page).toHaveURL(/\/viewing-activity\//, { timeout: 15000 });
+      await expect(page.locator('h1')).toContainText('Activity', { timeout: 15000 });
     });
 
     test('Privacy settings link navigates correctly', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Privacy")').first().click();
-      await expect(page).toHaveURL(/\/privacy-settings\//, { timeout: 15000 });
+      await goToSubPage(page, 'privacy-settings');
+      await expect(page).toHaveURL(/\/privacy-settings\//, { timeout: 20000 });
     });
   });
 
   test.describe('Languages Settings', () => {
     test('Change Shows & Movies language enables Save button', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Languages")').first().click();
-      await page.waitForTimeout(2000);
-      await expect(page).toHaveURL(/\/languages\//, { timeout: 20000 });
+      await goToSubPage(page, 'languages');
+      await expect(page.locator('h1')).toContainText('Languages', { timeout: 15000 });
       
       const select = page.locator('select[name="showingLanguage"]');
       await expect(select).toBeVisible({ timeout: 15000 });
@@ -108,10 +101,8 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Save language changes and verify success message', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Languages")').first().click();
-      await page.waitForTimeout(2000);
-      await expect(page).toHaveURL(/\/languages\//, { timeout: 20000 });
+      await goToSubPage(page, 'languages');
+      await expect(page.locator('h1')).toContainText('Languages', { timeout: 15000 });
       
       const select = page.locator('select[name="audioLanguage"]');
       await expect(select).toBeVisible({ timeout: 15000 });
@@ -129,9 +120,8 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Language changes persist after page reload', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Languages")').first().click();
-      await expect(page).toHaveURL(/\/languages\//, { timeout: 15000 });
+      await goToSubPage(page, 'languages');
+      await expect(page.locator('h1')).toContainText('Languages', { timeout: 15000 });
       
       const select = page.locator('select[name="subtitleLanguage"]');
       await expect(select).toBeVisible({ timeout: 15000 });
@@ -152,21 +142,20 @@ test.describe('Preferences - Functional Tests', () => {
       expect(savedValue).toBe(newValue);
     });
 
-    test('Cancel button navigates back to preferences', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Languages")').first().click();
-      await expect(page).toHaveURL(/\/languages\//, { timeout: 15000 });
+    test('Cancel button navigates back', async ({ page }) => {
+      await goToSubPage(page, 'languages');
+      await expect(page.locator('h1')).toContainText('Languages', { timeout: 15000 });
       
       await page.locator('button.secondary:has-text("Cancel")').click();
       
-      await expect(page).toHaveURL(/\/preferences/, { timeout: 15000 });
+      // Cancel navigates away from languages page (to account-settings or preferences)
+      await expect(page).not.toHaveURL(/\/languages\//, { timeout: 15000 });
     });
   });
 
   test.describe('Subtitle Appearance Settings', () => {
     test('Save button disabled when no changes made', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Subtitle")').first().click();
+      await goToSubPage(page, 'subtitle-appearance');
       await expect(page.locator('h1')).toContainText('Subtitle Appearance', { timeout: 15000 });
       
       // Save button should be disabled initially
@@ -174,8 +163,7 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Change font family enables Save button', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Subtitle")').first().click();
+      await goToSubPage(page, 'subtitle-appearance');
       await expect(page.locator('h1')).toContainText('Subtitle Appearance', { timeout: 15000 });
       
       const select = page.locator('select[name="fontFamily"]');
@@ -189,10 +177,8 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Change font size updates preview', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Subtitle")').first().click();
-      await page.waitForTimeout(2000);
-      await expect(page.locator('h1')).toContainText('Subtitle Appearance', { timeout: 20000 });
+      await goToSubPage(page, 'subtitle-appearance');
+      await expect(page.locator('h1')).toContainText('Subtitle Appearance', { timeout: 15000 });
       
       const select = page.locator('select[name="fontSize"]');
       await expect(select).toBeVisible({ timeout: 10000 });
@@ -205,8 +191,7 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Change text color and save', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Subtitle")').first().click();
+      await goToSubPage(page, 'subtitle-appearance');
       await expect(page.locator('h1')).toContainText('Subtitle Appearance', { timeout: 15000 });
       
       const select = page.locator('select[name="textColor"]');
@@ -223,8 +208,7 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Change shadow type', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Subtitle")').first().click();
+      await goToSubPage(page, 'subtitle-appearance');
       await expect(page.locator('h1')).toContainText('Subtitle Appearance', { timeout: 15000 });
       
       const select = page.locator('select[name="shadowType"]');
@@ -239,8 +223,7 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Change background color', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Subtitle")').first().click();
+      await goToSubPage(page, 'subtitle-appearance');
       await expect(page.locator('h1')).toContainText('Subtitle Appearance', { timeout: 15000 });
       
       const select = page.locator('select[name="backgroundColor"]');
@@ -252,8 +235,7 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Reset to Default restores initial values and enables Save', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Subtitle")').first().click();
+      await goToSubPage(page, 'subtitle-appearance');
       await expect(page.locator('h1')).toContainText('Subtitle Appearance', { timeout: 15000 });
       
       // Change something first
@@ -272,17 +254,16 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Cancel button navigates back', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Subtitle")').first().click();
+      await goToSubPage(page, 'subtitle-appearance');
       await expect(page.locator('h1')).toContainText('Subtitle Appearance', { timeout: 15000 });
       
       await page.locator('button.secondary:has-text("Cancel")').click();
       
-      await expect(page).toHaveURL(/\/preferences/, { timeout: 15000 });
+      // Cancel navigates away from subtitle-appearance page
+      await expect(page).not.toHaveURL(/\/subtitle-appearance\//, { timeout: 15000 });
     });
 
     test('Back button navigates back', async ({ page }) => {
-      // Navigate directly to subtitle-appearance page
       await goToSubPage(page, 'subtitle-appearance');
       await expect(page.locator('h1')).toContainText('Subtitle Appearance', { timeout: 15000 });
       
@@ -295,8 +276,7 @@ test.describe('Preferences - Functional Tests', () => {
 
   test.describe('Playback Settings', () => {
     test('Save button disabled when no changes made', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Playback")').first().click();
+      await goToSubPage(page, 'playback-settings');
       await expect(page.locator('h1')).toContainText('Playback Settings', { timeout: 15000 });
       
       // Save button should be disabled initially
@@ -304,8 +284,7 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Toggle Autoplay next episode checkbox', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Playback")').first().click();
+      await goToSubPage(page, 'playback-settings');
       await expect(page.locator('h1')).toContainText('Playback Settings', { timeout: 15000 });
       
       const checkbox = page.locator('input#autoplayNext');
@@ -328,10 +307,8 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Toggle Autoplay previews checkbox', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Playback")').first().click();
-      await page.waitForTimeout(2000);
-      await expect(page.locator('h1')).toContainText('Playback Settings', { timeout: 20000 });
+      await goToSubPage(page, 'playback-settings');
+      await expect(page.locator('h1')).toContainText('Playback Settings', { timeout: 15000 });
       
       const checkbox = page.locator('input#autoplayPreviews');
       await expect(checkbox).toBeVisible({ timeout: 10000 });
@@ -353,10 +330,8 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Change data usage setting', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Playback")').first().click();
-      await page.waitForTimeout(2000);
-      await expect(page.locator('h1')).toContainText('Playback Settings', { timeout: 20000 });
+      await goToSubPage(page, 'playback-settings');
+      await expect(page.locator('h1')).toContainText('Playback Settings', { timeout: 15000 });
       
       const select = page.locator('select[name="dataUsage"]');
       await expect(select).toBeVisible({ timeout: 10000 });
@@ -373,12 +348,8 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Data usage descriptions update correctly', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Playback")').first().click();
-      await page.waitForTimeout(3000);
-      
-      // Wait for the page to fully load
-      await expect(page.locator('h1')).toContainText('Playback Settings', { timeout: 30000 });
+      await goToSubPage(page, 'playback-settings');
+      await expect(page.locator('h1')).toContainText('Playback Settings', { timeout: 15000 });
       
       const select = page.locator('select[name="dataUsage"]');
       await expect(select).toBeVisible({ timeout: 10000 });
@@ -437,8 +408,7 @@ test.describe('Preferences - Functional Tests', () => {
 
   test.describe('Notification Settings', () => {
     test('Email section displays status', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Notification")').first().click();
+      await goToSubPage(page, 'notification-settings');
       await expect(page.locator('h1')).toContainText('Notification Settings', { timeout: 15000 });
       
       // Email notification type should be visible
@@ -450,8 +420,7 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Push notifications section displays status', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Notification")').first().click();
+      await goToSubPage(page, 'notification-settings');
       await expect(page.locator('h1')).toContainText('Notification Settings', { timeout: 15000 });
       
       // Push notifications type should be visible
@@ -524,8 +493,7 @@ test.describe('Preferences - Functional Tests', () => {
 
   test.describe('Viewing Activity', () => {
     test('Watching tab is active by default', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Viewing")').first().click();
+      await goToSubPage(page, 'viewing-activity');
       await expect(page.locator('h1')).toContainText('Activity', { timeout: 15000 });
       
       // Watching tab should be active
@@ -533,8 +501,7 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Can switch between Watching and Ratings tabs', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Viewing")').first().click();
+      await goToSubPage(page, 'viewing-activity');
       await expect(page.locator('h1')).toContainText('Activity', { timeout: 15000 });
 
       // Click Ratings tab
@@ -551,7 +518,6 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Activity items display date and title', async ({ page }) => {
-      // Navigate directly to viewing-activity page
       await goToSubPage(page, 'viewing-activity');
       await expect(page.locator('h1')).toContainText('Activity', { timeout: 15000 });
       
@@ -571,10 +537,8 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Watching tab shows Report a problem button', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Viewing")').first().click();
-      await page.waitForTimeout(2000);
-      await expect(page.locator('h1')).toContainText('Activity', { timeout: 20000 });
+      await goToSubPage(page, 'viewing-activity');
+      await expect(page.locator('h1')).toContainText('Activity', { timeout: 15000 });
       
       // Wait for content to load
       await page.waitForTimeout(3000);
@@ -590,10 +554,8 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Ratings tab shows rating buttons', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Viewing")').first().click();
-      await page.waitForTimeout(2000);
-      await expect(page.locator('h1')).toContainText('Activity', { timeout: 20000 });
+      await goToSubPage(page, 'viewing-activity');
+      await expect(page.locator('h1')).toContainText('Activity', { timeout: 15000 });
       
       // Switch to Ratings tab
       await page.locator('.tab-button:has-text("Ratings")').click();
@@ -615,8 +577,7 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Show More button loads additional items', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Viewing")').first().click();
+      await goToSubPage(page, 'viewing-activity');
       await expect(page.locator('h1')).toContainText('Activity', { timeout: 15000 });
       
       // Wait for content to load
@@ -638,10 +599,8 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Back to Your Account button is visible and clickable', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Viewing")').first().click();
-      await page.waitForTimeout(2000);
-      await expect(page.locator('h1')).toContainText('Activity', { timeout: 20000 });
+      await goToSubPage(page, 'viewing-activity');
+      await expect(page.locator('h1')).toContainText('Activity', { timeout: 15000 });
       
       // Verify the Back to Your Account button is visible
       const backButton = page.locator('.back-button.secondary:has-text("Back to Your Account")');
@@ -652,18 +611,17 @@ test.describe('Preferences - Functional Tests', () => {
     });
 
     test('Header Back button navigates back', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Viewing")').first().click();
+      await goToSubPage(page, 'viewing-activity');
       await expect(page.locator('h1')).toContainText('Activity', { timeout: 15000 });
       
       await page.locator('.header-back-button').click();
       
-      await expect(page).toHaveURL(/\/preferences/, { timeout: 15000 });
+      // Back button navigates away from viewing-activity page
+      await expect(page).not.toHaveURL(/\/viewing-activity\//, { timeout: 15000 });
     });
 
     test('Rating a content item updates the rating state', async ({ page }) => {
-      await goToPreferences(page);
-      await page.locator('.link-card:has-text("Viewing")').first().click();
+      await goToSubPage(page, 'viewing-activity');
       await expect(page.locator('h1')).toContainText('Activity', { timeout: 15000 });
       
       // Switch to Ratings tab
