@@ -22,6 +22,56 @@ const gotoProtectedPage = async (page, url, maxRetries = 3) => {
 
 test.describe('Change Plan - Functional Tests', () => {
 
+  test('Current plan displays "Current Plan" badge', async ({ page }) => {
+    await gotoProtectedPage(page, '/account-settings/change-plan');
+    await expect(page.locator('h1')).toContainText('Change Plan', { timeout: 15000 });
+
+    // Wait for plans to load
+    await page.waitForSelector('.plan-card', { timeout: 15000 });
+    
+    // One plan should have the "current" class and display "Current Plan" badge
+    const currentPlanCard = page.locator('.plan-card.current');
+    const currentBadge = page.locator('.current-badge');
+    
+    // Check if customer has a current plan (may not have one if no subscription)
+    const hasCurrentPlan = await currentPlanCard.isVisible().catch(() => false);
+    
+    if (hasCurrentPlan) {
+      await expect(currentPlanCard).toBeVisible();
+      await expect(currentBadge).toBeVisible();
+      await expect(currentBadge).toContainText('Current Plan');
+    } else {
+      // Customer has no plan - all plans should be selectable without "Current" badge
+      const planCards = page.locator('.plan-card');
+      await expect(planCards.first()).toBeVisible();
+    }
+  });
+
+  test('Navigate from Membership to Change Plan shows current plan marked', async ({ page }) => {
+    // Start from membership page
+    await page.goto('/account-settings/membership', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle', { timeout: 30000 });
+    
+    // Check if plan card exists (customer has a subscription)
+    const planCard = page.locator('.plan-card .link-card');
+    const hasPlanCard = await planCard.isVisible().catch(() => false);
+    
+    if (hasPlanCard) {
+      // Click on plan to go to change-plan
+      await planCard.click();
+      await expect(page).toHaveURL(/\/account-settings\/change-plan/, { timeout: 15000 });
+      
+      // Verify current plan is marked
+      const currentPlanCard = page.locator('.plan-card.current');
+      const currentBadge = page.locator('.current-badge');
+      
+      await expect(currentPlanCard).toBeVisible({ timeout: 10000 });
+      await expect(currentBadge).toContainText('Current Plan');
+    } else {
+      test.skip('Customer has no subscription');
+    }
+  });
+
   test('Continue button disabled when no plan selected', async ({ page }) => {
     await gotoProtectedPage(page, '/account-settings/change-plan');
     await expect(page.locator('h1')).toContainText('Change Plan', { timeout: 15000 });
