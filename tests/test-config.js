@@ -1,7 +1,6 @@
-
 export const testUser = {
-  email: 'lova.ramiharisoa@gmail.com',
-  password: 'test1234',
+  email: process.env.TEST_USER_EMAIL || 'lova.ramiharisoa@gmail.com',
+  password: process.env.TEST_USER_PASSWORD || 'test1234',
 };
 
 export const loginWithRealCredentials = async (page) => {

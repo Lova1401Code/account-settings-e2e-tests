@@ -1,6 +1,10 @@
 import { defineConfig } from '@playwright/test';
+import dotenv from 'dotenv';
 
-// Configuration flexible via variables d'environnement https://www.allmovies2a.dev/
+// Charger les variables d'environnement depuis .env
+dotenv.config();
+
+// Configuration flexible via variables d'environnement
 const baseURL = process.env.BASE_URL || 'https://www.allmovies2a.dev/';
 
 export default defineConfig({
