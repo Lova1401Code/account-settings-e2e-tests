@@ -1,5 +1,5 @@
 export const testUser = {
-  email: process.env.TEST_USER_EMAIL || 'lova.ramiharisoa@gmail.com',
+  email: process.env.TEST_USER_EMAIL || 'dotoy38454@cameltok.com',
   password: process.env.TEST_USER_PASSWORD || 'test1234',
 };
 

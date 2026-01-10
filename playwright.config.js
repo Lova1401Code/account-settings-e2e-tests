@@ -4,8 +4,8 @@ import dotenv from 'dotenv';
 // Charger les variables d'environnement depuis .env
 dotenv.config();
 
-// Configuration flexible via variables d'environnement
-const baseURL = process.env.BASE_URL || 'https://www.allmovies2a.dev/';
+// Configuration flexible via variables d'environnementhttps://www.allmovies2a.dev/
+const baseURL = process.env.BASE_URL || 'http://localhost:5173/';
 
 export default defineConfig({
   testDir: './tests',
