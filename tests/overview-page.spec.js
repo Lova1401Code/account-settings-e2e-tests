@@ -14,21 +14,17 @@ test.describe('Overview Page - Functional Tests', () => {
     test('Displays membership information correctly', async ({ page }) => {
       await waitForOverviewPage(page);
       
-      // Wait for membership card to load
       const membershipCard = page.locator('.membership-card');
       await expect(membershipCard).toBeVisible({ timeout: 15000 });
       
-      // Check all required fields are displayed
-      await expect(page.locator('.membership-label:has-text("Member since")')).toBeVisible();
+      await expect(page.locator('.member-since-badge:has-text("Member since")')).toBeVisible();
       await expect(page.locator('.membership-label:has-text("Plan")')).toBeVisible();
       await expect(page.locator('.membership-label:has-text("Next payment")')).toBeVisible();
       await expect(page.locator('.membership-label:has-text("Payment method")')).toBeVisible();
       
-      // Check plan value (should be either plan name or "No plan")
       const planValue = await page.locator('.membership-row:has(.membership-label:has-text("Plan")) .membership-value').textContent();
       expect(planValue.includes('plan') || planValue.includes('No plan')).toBeTruthy();
       
-      // Check payment method value (should be card ending or "No payment method")
       const paymentValue = await page.locator('.membership-row:has(.membership-label:has-text("Payment method")) .membership-value').textContent();
       expect(paymentValue.includes('••••') || paymentValue.includes('No payment method')).toBeTruthy();
     });

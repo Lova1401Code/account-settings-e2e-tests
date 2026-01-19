@@ -59,22 +59,22 @@ test.describe('Payment Method - Functional Tests', () => {
 
   test.describe('Update Payment Method', () => {
 
-    test('Update button on default card opens modal', async ({ page }) => {
+    test('Add new payment method button on default card opens modal', async ({ page }) => {
       await gotoPaymentMethod(page);
       
       const defaultCard = page.locator('.default-card');
       const hasPaymentMethod = await defaultCard.isVisible().catch(() => false);
       
       if (hasPaymentMethod) {
-        const updateButton = defaultCard.locator('button.secondary:has-text("Update")');
-        await expect(updateButton).toBeVisible();
+        const addButton = defaultCard.locator('button.secondary:has-text("Add new payment method")');
+        await expect(addButton).toBeVisible();
         
-        await updateButton.click();
+        await addButton.click();
         
         // Modal should open
         await expect(page.locator('.modal-overlay, .modal, [role="dialog"]')).toBeVisible({ timeout: 10000 });
       } else {
-        test.skip('No payment method to update');
+        test.skip('No payment method saved');
       }
     });
   });

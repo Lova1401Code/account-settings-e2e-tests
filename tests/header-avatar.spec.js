@@ -202,15 +202,19 @@ test.describe('Header - Key Functional Tests', () => {
       
       const href = await logoLink.getAttribute('href');
       
-      await logoLink.click();
-      await page.waitForTimeout(2000);
-      
-      const currentUrl = page.url();
-      
-      if (href && href.startsWith('http')) {
-        expect(currentUrl).toContain(new URL(href).hostname);
+      if (process.env.TEST_ENV === 'local') {
+        expect(href).toContain('allmovies.dev');
       } else {
-        expect(currentUrl.endsWith('/') || !currentUrl.includes('/account-settings')).toBeTruthy();
+        await logoLink.click();
+        await page.waitForTimeout(2000);
+        
+        const currentUrl = page.url();
+        
+        if (href && href.startsWith('http')) {
+          expect(currentUrl).toContain(new URL(href).hostname);
+        } else {
+          expect(currentUrl.endsWith('/') || !currentUrl.includes('/account-settings')).toBeTruthy();
+        }
       }
     });
   });

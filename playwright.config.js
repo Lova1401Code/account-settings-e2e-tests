@@ -1,10 +1,16 @@
 import { defineConfig } from '@playwright/test';
 import dotenv from 'dotenv';
+import path from 'path';
 
-// Charger les variables d'environnement depuis .env
 dotenv.config();
 
-// Configuration flexible via variables d'environnementhttps://www.allmovies2a.dev/
+const ENV = process.env.TEST_ENV || 'local';
+
+const envFile = `.env.${ENV}`;
+dotenv.config({ 
+  path: path.resolve(process.cwd(), envFile),
+  debug: false
+});
 const baseURL = process.env.BASE_URL || 'http://localhost:5173/';
 
 export default defineConfig({
@@ -28,21 +34,15 @@ export default defineConfig({
     ['html', { open: 'never' }]
   ],
   
-  // Projets : setup d'authentification + tests
   projects: [
-    // Projet de setup : se connecte et sauvegarde la session
     {
       name: 'setup',
       testMatch: /auth\.setup\.js/,
     },
-    // Projet pour les tests SANS authentification (signup, signin, forgot-password)
     {
       name: 'no-auth',
       testMatch: /signup\.spec\.js|signin\.spec\.js|forgot-password\.spec\.js/,
-      // Pas de storageState = pas d'authentification
-      // Pas de dependencies = ne dépend pas du setup
     },
-    // Projet principal : utilise la session authentifiée
     {
       name: 'chromium',
       use: {

@@ -215,7 +215,7 @@ test.describe('Security & Identity - Functional Tests', () => {
     await page.locator('button.submit-button:has-text("Continue")').click();
 
     // Phone modal should open
-    await expect(page.locator('.modal.open h2')).toContainText('Phone', { timeout: 15000 });
+    await expect(page.locator('.modal.open > .modal-content > h2')).toContainText('Phone', { timeout: 15000 });
   });
 
   test('Password link navigates to change password page', async ({ page }) => {
