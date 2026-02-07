@@ -1,4 +1,4 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -42,6 +42,24 @@ export default defineConfig({
     {
       name: 'no-auth',
       testMatch: /signup\.spec\.js|signin\.spec\.js|forgot-password\.spec\.js/,
+    },
+    {
+      name: 'responsive-mobile',
+      testDir: './tests-responsive',
+      use: {
+        ...devices['iPhone 13'],
+        storageState: '.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'responsive-tablet',
+      testDir: './tests-responsive',
+      use: {
+        ...devices['iPad Mini'],
+        storageState: '.auth/user.json',
+      },
+      dependencies: ['setup'],
     },
     {
       name: 'chromium',
